@@ -86,10 +86,13 @@ class FindDiskCenterEllipseFitting(UDF):
         edge = canny(frame, low_threshold= low_threshold,high_threshold = high_threshold,use_quantiles=True)
         pts = np.argwhere(edge)
         x, y = pts[:,0],pts[:,1]
-        coeffs = FitEllipse(x,y)
-        x0, y0, ap, bp, e, phi = Cartesian2Polar(coeffs)
+        ## Handle excpetion if the ellipse fitting fails due to too low intensity (such as due to bending), or disk distortion (such as due sample edge or boundary)
+        try:
+            coeffs = FitEllipse(x,y)        
+            x0, y0, ap, bp, e, phi = Cartesian2Polar(coeffs)
+        except:
+            x0, y0 = 0, 0 
         self.results.center[:] = (x0, y0)
-
 
 class VirtualFieldImaging(UDF):
     def __init__(self, cx, cy, rin, rout, *args, **kwargs):
