@@ -1,0 +1,10 @@
+Metadata-Version: 2.1
+Name: stem_tools
+Version: 0.0.1
+Summary: Collection of functions for daily STEM, 4D-STEM, EELS data analysis
+Author-email: Haoyang Ni <hni6@illinois.edu>
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown

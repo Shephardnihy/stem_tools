@@ -1,0 +1,11 @@
+Metadata-Version: 2.1
+Name: stem_tools
+Version: 0.1
+Summary: Useful functions for (4D)-STEM data analysis
+Author: Haoyang Ni
+Author-email: hni6@illinois.edu
+Requires-Dist: numpy
+Requires-Dist: matplotlib
+Requires-Dist: xarray
+Requires-Dist: dask
+Requires-Dist: libertem

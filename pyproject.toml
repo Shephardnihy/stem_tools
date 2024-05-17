@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0", ]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stem_tools"
+version = "0.0.1"
+authors = [
+  { name="Haoyang Ni", email="hni6@illinois.edu" },
+]
+description = "Collection of functions for daily STEM, 4D-STEM, EELS data analysis"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+
