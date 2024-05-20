@@ -29,6 +29,25 @@ def get_metadata_from_hdr(filepath):
 
     return metadata
 
+
+def get_metadata_from_json(filepath):
+    """Get metadata stored in .json file exported from Nion Swift
+
+    Parameters
+    ----------
+    filepath : string
+        Path to .hdr file
+
+    Returns
+    -------
+    metadata : dict
+        A dictionary storing all metadata
+    """
+
+    ### To be filled
+
+    return metadata
+
         
 def numpy_to_xarray(data_array, dims, calibration = None, attrs = None):
     """Convert numpy array to xarray array
