@@ -1,7 +1,9 @@
 from libertem.udf import UDF
 from skimage.transform import downscale_local_mean
 from skimage.feature import canny
-from scipy.ndimage import shift, rotate
+from skimage.registration import phase_cross_correlation
+from skimage.filters import sobel
+from scipy.ndimage import shift, rotate, center_of_mass
 import numpy as np
 from .utils import *
 
@@ -61,7 +63,7 @@ class PreprocessFRMS6(UDF):
 
 
 class FindDiskCenterEllipseFitting(UDF):
-    def __init__(self, low_threshold= 0.3, high_threshold = 1, *args, **kwargs):
+    def __init__(self, sigma = 1, low_threshold= 0.3, high_threshold = 1, *args, **kwargs):
         """
         Find 4D-STEM Disk Center using Ellipse Fitting. Ellipse Fitting is useful when diffraction disk has a well-defined edge and only have one disk. 
         For example, atomic resolution 4D-STEM dataset on a thin sample or 4D-STEM dataset acquired on vacuum region for descan calibration.
@@ -71,7 +73,7 @@ class FindDiskCenterEllipseFitting(UDF):
         threshold : float
             Intensity threshold to binarized the image for Canny edge detection
         """
-        super().__init__(*args, low_threshold= low_threshold, high_threshold = high_threshold, **kwargs)
+        super().__init__(*args, sigma = sigma, low_threshold= low_threshold, high_threshold = high_threshold, **kwargs)
 
     def get_result_buffers(self):
         return {
@@ -82,8 +84,9 @@ class FindDiskCenterEllipseFitting(UDF):
     def process_frame(self, frame):
         low_threshold = self.params.low_threshold
         high_threshold = self.params.high_threshold
+        sigma = self.params.sigma
 
-        edge = canny(frame, low_threshold= low_threshold,high_threshold = high_threshold,use_quantiles=True)
+        edge = canny(frame, sigma = sigma, low_threshold= low_threshold,high_threshold = high_threshold,use_quantiles=True)
         pts = np.argwhere(edge)
         x, y = pts[:,0],pts[:,1]
         coeffs = FitEllipse(x,y)
@@ -124,3 +127,63 @@ class VirtualFieldImaging(UDF):
         mask = ((sxx - cx)**2 + (syy - cy)**2 < rout**2)&((sxx - cx)**2 + (syy - cy)**2 > rin**2)
 
         self.results.virtual_image[:] = (frame*mask).sum()
+
+
+class FindDiskShiftCrossCorrelation(UDF):
+    def __init__(self, reference_img, upsample_factor = 16, *args, **kwargs):
+        """
+        Find 4D-STEM Disk Deflection using Cross-Correlation.
+        parameters
+        ----------
+        reference_img : ndarray
+            Reference image for cross-correlation
+        upsample_factor : int
+            subpixel accuracy
+        """
+        super().__init__(*args, reference_img = reference_img, upsample_factor = upsample_factor)
+    
+    def get_result_buffers(self):
+        return {
+            "shift": self.buffer(kind = 'nav', dtype = np.float64, extra_shape = (2,))
+        }
+    
+    def process_frame(self, frame):
+        reference_img = self.params.reference_img
+        upsample_factor = self.params.upsample_factor
+        
+        s, _, _ = phase_cross_correlation(reference_image = reference_img, 
+                                          moving_image = frame,
+                                          upsample_factor=upsample_factor)
+        self.results.shift[:] = s
+
+
+class FindDiskShiftCOM(UDF):
+    def __init__(self, cx, cy, rin, rout = None, ifsobel = False, *args, **kwargs):
+        """
+        Find 4D-STEM Disk Deflection using Center-of-mass method
+        parameters
+        ----------
+        """
+        if rout is None:
+            rout = 1000
+
+        super().__init__(*args,cx = cx, cy = cy, rin = rin, rout = rout, ifsobel = ifsobel)
+    
+    def get_result_buffers(self):
+        return {
+            "shift": self.buffer(kind = 'nav', dtype = np.float64, extra_shape = (2,))
+        }
+    
+    def process_frame(self, frame):
+        cx, cy, rin, rout, ifsobel = self.params.cx, self.params.cy, self.params.rin, self.params.rout, self.params.ifsobel
+        sx, sy = self.meta.dataset_shape[2], self.meta.dataset_shape[3]
+
+        if ifsobel:
+            frame_filtered = sobel(frame)
+        else:
+            frame_filtered = frame
+        
+        sxx, syy = np.mgrid[0:sx, 0:sy]      
+        mask = ((sxx - cx)**2 + (syy - cy)**2 < rout**2)&((sxx - cx)**2 + (syy - cy)**2 > rin**2)      
+
+        self.results.shift[:] =  center_of_mass(frame_filtered*mask)        

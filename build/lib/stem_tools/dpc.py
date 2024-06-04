@@ -1,7 +1,7 @@
 import numpy as np
 from skimage.feature import canny
 from scipy.optimize import minimize
-import matplotlib
+from numpy.fft import fftshift, ifftshift, fftn, ifftn, fftfreq
 
 def RotateClock(vx,vy,theta):
     """
@@ -81,6 +81,43 @@ def GetScanDetRotCurl(vx, vy):
     ang = minimize(GetTotalCurl, 0, args = (vx, vy), method = 'Nelder-Mead')
     return ang.x
 
+def GetiDPC(vx, vy, lpass = 0, hpass = 0):
+    """
+    Calculate the iDPC signal based on Poisson Equation using FFT. Under kinematical approximation, iDPC signal recovers the electrostatic potential
+    
+    parameters
+    ----------
+    vx : 2d numpy array
+        x component of a vector field
+    
+    vy : 2d numpy array
+        y component of a vector field
+
+    lpass : float
+        amplitude for low-pass filtering
+    
+    hpass : float
+        amplitude for high-pass filtering
+
+    returns
+    -------
+    phi : 2d numpy array
+        scalar iDPC signal
+    """
+    sx, sy = vx.shape
+
+    ky, kx = fftshift(fftfreq(sx,1)), fftshift(fftfreq(sy, 1))
+    kxx, kyy = np.meshgrid(kx,ky)
+    k2 = kxx**2 + kyy**2
+    fdenom= 2*np.pi*(0+1j)*(hpass+(kxx**2+kyy**2)+lpass*(kxx**2+kyy**2)**2)
+    fdenom[fdenom == 0] = 1e-12
+
+    Vfx, Vfy = fftshift(fftn(ifftshift(vx))), fftshift(fftn(ifftshift(vy)))
+    G = -(kxx*Vfx + kyy*Vfy)
+    phi = fftshift(ifftn(ifftshift(G/fdenom)))
+    return phi.real
+
+
 def GetFieldTraits(vx, vy):
     """
     Get traits of vector fields
@@ -108,3 +145,53 @@ def GetFieldTraits(vx, vy):
     curl = -np.gradient(vx)[0] + np.gradient(vy)[1]
     mag = np.sqrt(vx**2 + vy**2)
     return grad, curl, mag
+
+def HelmholtzDecomposition(vx, vy):
+    """
+    Apply 2D Helmholtz Decomposition to separate irrotational (curl-free) and solenoidal (divergence-free) vector field.
+
+    Parameters
+    ----------
+    vx : 2d numpy array
+        x component of a vector field
+    
+    vy : 2d numpy array
+        y component of a vector field
+
+    returns
+    -------
+    phix : 2d numpy array
+        x component of the irrotational field
+    
+    phiy : 2d numpy array
+        y component of the irrotational field
+
+    Ax : 2d numpy array
+        x component of the solenoidal field
+
+    Ay : 2d numpy array
+        y component of the irrotational field
+    """
+    sx, sy = vx.shape
+
+    ky, kx = fftfreq(sx,1), fftfreq(sy, 1)
+    kxx, kyy = np.meshgrid(kx,ky)
+    k2 = kxx**2 + kyy**2
+    k2[0,0]=1e-12
+
+    Vfx, Vfy = fftn(vx), fftn(vy)
+
+    Gphik = 1j*(kxx*Vfx + kyy*Vfy)/k2
+    GAk = 1j*(kxx*Vfy-kyy*Vfx)/k2
+
+    phi = ifftn(Gphik).real
+    A = ifftn(GAk).real # along z-axis
+
+    # Get Curl-Free Field
+    phiy, phix = -1*np.array(np.gradient(phi))
+
+    # Get Div-Free Field
+    Ax, Ay = np.gradient(A)
+    Ay*=-1
+
+    return phix, phiy, Ax, Ay
