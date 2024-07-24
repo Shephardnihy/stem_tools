@@ -2,7 +2,8 @@ from libertem.udf import UDF
 from skimage.transform import downscale_local_mean
 from skimage.feature import canny
 from skimage.registration import phase_cross_correlation
-from scipy.ndimage import shift, rotate
+from skimage.filters import sobel
+from scipy.ndimage import shift, rotate, center_of_mass
 import numpy as np
 from .utils import *
 
@@ -49,15 +50,16 @@ class PreprocessFRMS6(UDF):
         frame_gain_corrected = downscale_local_mean(frame, hardware_bin)*gainmap
         #print(shifts)
         if self.params.shifts is None:
-            frame_rotated = rotate(frame_gain_corrected, rotation, reshape = False)
             frame_binned = downscale_local_mean(frame_rotated, software_bin)
+            frame_rotated = rotate(frame_gain_corrected, rotation, reshape = False)
         else:
             shifts = self.params.shifts[:]
-            frame_shifted = shift(frame_gain_corrected , shifts)
+            frame_binned = downscale_local_mean(frame_gain_corrected, software_bin)
+            frame_shifted = shift(frame_binned , shifts)
             frame_rotated = rotate(frame_shifted, rotation, reshape = False)
-            frame_binned = downscale_local_mean(frame_rotated, software_bin)
             
-        frame_final = frame_binned.astype('int16')
+            
+        frame_final = frame_rotated.astype('int16')
         self.results.pattern[:] = frame_final[:]
 
 
@@ -154,3 +156,35 @@ class FindDiskShiftCrossCorrelation(UDF):
                                           moving_image = frame,
                                           upsample_factor=upsample_factor)
         self.results.shift[:] = s
+
+
+class FindDiskShiftCOM(UDF):
+    def __init__(self, cx, cy, rin, rout = None, ifsobel = False, *args, **kwargs):
+        """
+        Find 4D-STEM Disk Deflection using Center-of-mass method
+        parameters
+        ----------
+        """
+        if rout is None:
+            rout = 1000
+
+        super().__init__(*args,cx = cx, cy = cy, rin = rin, rout = rout, ifsobel = ifsobel)
+    
+    def get_result_buffers(self):
+        return {
+            "shift": self.buffer(kind = 'nav', dtype = np.float64, extra_shape = (2,))
+        }
+    
+    def process_frame(self, frame):
+        cx, cy, rin, rout, ifsobel = self.params.cx, self.params.cy, self.params.rin, self.params.rout, self.params.ifsobel
+        sx, sy = self.meta.dataset_shape[2], self.meta.dataset_shape[3]
+
+        if ifsobel:
+            frame_filtered = sobel(frame)
+        else:
+            frame_filtered = frame
+        
+        sxx, syy = np.mgrid[0:sx, 0:sy]      
+        mask = ((sxx - cx)**2 + (syy - cy)**2 < rout**2)&((sxx - cx)**2 + (syy - cy)**2 > rin**2)      
+
+        self.results.shift[:] =  center_of_mass(frame_filtered*mask)        
