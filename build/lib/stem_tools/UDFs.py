@@ -50,8 +50,8 @@ class PreprocessFRMS6(UDF):
         frame_gain_corrected = downscale_local_mean(frame, hardware_bin)*gainmap
         #print(shifts)
         if self.params.shifts is None:
-            frame_binned = downscale_local_mean(frame_rotated, software_bin)
-            frame_rotated = rotate(frame_gain_corrected, rotation, reshape = False)
+            frame_binned = downscale_local_mean(frame_gain_corrected, software_bin)
+            frame_rotated = rotate(frame_binned, rotation, reshape = False)
         else:
             shifts = self.params.shifts[:]
             frame_binned = downscale_local_mean(frame_gain_corrected, software_bin)
