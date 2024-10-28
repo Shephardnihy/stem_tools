@@ -4,7 +4,7 @@ from scipy.optimize import minimize
 import matplotlib
 
 
-def XYZ2RGB(x,y,z,BrightScale=1.0):
+def XYZ2RGB(vx,vy,vz,BrightScale=1.0):
     """
     Writtend by Haoyang Ni
 
@@ -34,7 +34,7 @@ def XYZ2RGB(x,y,z,BrightScale=1.0):
     r = np.sqrt(vx**2 + vy**2 + vz**2)
     r_xy = np.sqrt(vx**2 + vy**2)
 
-    hue = (np.pi - np.arctan2(vy, vx)) / (2 * np.pi)
+    hue = np.angle(vx + 1j*vy) / (2*np.pi) %1
     sat = r_xy/r
     val = (np.arccos(vz / r) / np.pi)
     val = (val - val.min())/(val.max() - val.min())
@@ -42,6 +42,7 @@ def XYZ2RGB(x,y,z,BrightScale=1.0):
     hsv = np.stack([hue,sat,val*BrightScale], axis=-1)
     Cim=matplotlib.colors.hsv_to_rgb(hsv)
     return Cim
+
 
 def XY2RGB(vx, vy,BrightScale=1.0):
     """
